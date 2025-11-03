@@ -25,14 +25,24 @@ pipeline {
        stage('Push to ECR') {
     steps {
         withAWS(region: 'ap-south-1', credentials: 'aws-ecr-creds') {
-            sh '''
-                aws ecr get-login-password --region ap-south-1 \
-                | docker login --username AWS --password-stdin 108322181673.dkr.ecr.ap-south-1.amazonaws.com
-                docker push 108322181673.dkr.ecr.ap-south-1.amazonaws.com/ci-cd-demo:build-${BUILD_NUMBER}
-            '''
+            withEnv([
+                'AWS_REGION=ap-south-1',
+                'ECR_REGISTRY=108322181673.dkr.ecr.ap-south-1.amazonaws.com',
+                'IMAGE_NAME=ci-cd-demo'
+            ]) {
+                sh '''
+                    echo "Logging in to Amazon ECR..."
+                    aws ecr get-login-password --region $AWS_REGION \
+                    | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+                    echo "Pushing image to ECR..."
+                    docker push $ECR_REGISTRY/$IMAGE_NAME:build-${BUILD_NUMBER}
+                '''
+            }
         }
     }
 }
+
 
 
         stage('Deploy') {
