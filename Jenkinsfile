@@ -2,14 +2,13 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = 'ap-south-1'
-        AWS_ACCOUNT_ID = '108322181673'
-        ECR_REPO_NAME = 'ci-cd-demo'               // your ECR repo name
-        IMAGE_TAG = "build-${BUILD_NUMBER}"        // unique image tag for each build
+        AWS_REGION      = 'ap-south-1'
+        AWS_ACCOUNT_ID  = '108322181673'
+        ECR_REPO_NAME   = 'ci-cd-demo'                // ensure this matches ECR repo name
+        IMAGE_TAG       = "build-${BUILD_NUMBER}"
     }
 
     stages {
-
         stage('Checkout') {
             steps {
                 echo "Cloning repository..."
@@ -48,7 +47,7 @@ pipeline {
             }
         }
 
-        stage('Cleanup Local Images') {
+        stage('Cleanup') {
             steps {
                 echo "Cleaning up local Docker images..."
                 sh """
@@ -61,17 +60,17 @@ pipeline {
         stage('Deploy to EC2') {
             steps {
                 sshagent(['ec2-ssh-key']) {
-                    sh """
+                    sh '''
                     echo "Deploying container to EC2..."
 
                     ssh -o StrictHostKeyChecking=no ubuntu@43.205.142.131 '
-                        aws ecr get-login-password --region ${AWS_REGION} | sudo docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com &&
-                        sudo docker pull ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO_NAME}:${IMAGE_TAG} &&
+                        aws ecr get-login-password --region ap-south-1 | sudo docker login --username AWS --password-stdin 108322181673.dkr.ecr.ap-south-1.amazonaws.com &&
+                        sudo docker pull 108322181673.dkr.ecr.ap-south-1.amazonaws.com/myapp:latest || sudo docker pull 108322181673.dkr.ecr.ap-south-1.amazonaws.com/myapp:build-${BUILD_NUMBER} &&
                         sudo docker stop myapp || true &&
                         sudo docker rm myapp || true &&
-                        sudo docker run -d -p 80:8080 --name myapp ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO_NAME}:${IMAGE_TAG}
+                        sudo docker run -d -p 80:8080 --name myapp 108322181673.dkr.ecr.ap-south-1.amazonaws.com/myapp:build-${BUILD_NUMBER}
                     '
-                    """
+                    '''
                 }
             }
         }
@@ -79,10 +78,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ Build, Push, and Deployment completed successfully!"
+            echo "✅ Build and deploy completed successfully!"
         }
         failure {
-            echo "❌ Pipeline failed. Check the logs for details."
+            echo "❌ Build failed. Check logs for details."
         }
     }
 }
