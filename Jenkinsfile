@@ -6,6 +6,9 @@ pipeline {
         AWS_ACCOUNT_ID = '108322181673'
         ECR_REPO_NAME = 'ci-cd-demo'               // your ECR repo name
         IMAGE_TAG = "build-${BUILD_NUMBER}"        // unique image tag for each build
+
+        // Email recipients (add multiple with commas if needed)
+        EMAIL_RECIPIENTS = "your_email@gmail.com"
     }
 
     stages {
@@ -80,10 +83,58 @@ pipeline {
     post {
         success {
             echo "✅ Build, Push, and Deployment completed successfully!"
+
+            // Email notification for success
+            emailext(
+                subject: "✅ SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                body: """
+                    <h2>✅ Build and Deployment Successful!</h2>
+                    <p><b>Project:</b> ${env.JOB_NAME}</p>
+                    <p><b>Build Number:</b> ${env.BUILD_NUMBER}</p>
+                    <p><b>Deployed to:</b> EC2 Instance (43.205.142.131)</p>
+                    <p>Check logs: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                    <br>
+                    <p>— Jenkins CI/CD Automation</p>
+                """,
+                to: "${EMAIL_RECIPIENTS}",
+                mimeType: 'text/html'
+            )
         }
+
         failure {
             echo "❌ Pipeline failed. Check the logs for details."
+
+            // Email notification for failure
+            emailext(
+                subject: "❌ FAILURE: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                body: """
+                    <h2>❌ Build or Deployment Failed!</h2>
+                    <p><b>Project:</b> ${env.JOB_NAME}</p>
+                    <p><b>Build Number:</b> ${env.BUILD_NUMBER}</p>
+                    <p>Check logs: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                    <br>
+                    <p>— Jenkins CI/CD Automation</p>
+                """,
+                to: "${EMAIL_RECIPIENTS}",
+                mimeType: 'text/html'
+            )
+        }
+
+        unstable {
+            emailext(
+                subject: "⚠️ UNSTABLE: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                body: """
+                    <h2>⚠️ Build is Unstable</h2>
+                    <p>Some stages may have failed tests or partial deployment.</p>
+                    <p><b>Project:</b> ${env.JOB_NAME}</p>
+                    <p><b>Build Number:</b> ${env.BUILD_NUMBER}</p>
+                    <p>Logs: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                    <br>
+                    <p>— Jenkins CI/CD Automation</p>
+                """,
+                to: "${EMAIL_RECIPIENTS}",
+                mimeType: 'text/html'
+            )
         }
     }
 }
-
