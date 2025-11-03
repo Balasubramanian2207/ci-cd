@@ -22,18 +22,18 @@ pipeline {
             }
         }
 
-        stage('Push to ECR') {
-            steps {
-                withAWS(region: "${AWS_REGION}", credentials: 'aws-ecr-creds') {
-                    script {
-                        sh """
-                        aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REPO}
-                        docker push ${ECR_REPO}:${IMAGE_TAG}
-                        """
-                    }
-                }
-            }
+       stage('Push to ECR') {
+    steps {
+        withAWS(region: 'ap-south-1', credentials: 'aws-ecr-creds') {
+            sh '''
+                aws ecr get-login-password --region ap-south-1 \
+                | docker login --username AWS --password-stdin 108322181673.dkr.ecr.ap-south-1.amazonaws.com
+                docker push 108322181673.dkr.ecr.ap-south-1.amazonaws.com/ci-cd-demo:build-${BUILD_NUMBER}
+            '''
         }
+    }
+}
+
 
         stage('Deploy') {
             steps {
