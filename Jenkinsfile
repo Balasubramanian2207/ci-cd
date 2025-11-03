@@ -3,52 +3,67 @@ pipeline {
 
     environment {
         AWS_REGION = 'ap-south-1'
-        ECR_REPO = '108322181673.dkr.ecr.ap-south-1.amazonaws.com/ci-cd-demo'
-        IMAGE_TAG = "build-${env.BUILD_NUMBER}"
+        AWS_ACCOUNT_ID = '108322181673'
+        ECR_REPO_NAME = 'myapp'   // change this to your ECR repository name
+        IMAGE_TAG = "latest"
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/Balasubramanian2207/CIA2.git'
+                echo 'Cloning repository...'
+                checkout scm
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    dockerImage = docker.build("${ECR_REPO}:${IMAGE_TAG}")
+                echo 'Building Docker image...'
+                sh '''
+                    docker build -t ${ECR_REPO_NAME}:${IMAGE_TAG} .
+                '''
+            }
+        }
+
+        stage('Login to AWS ECR') {
+            steps {
+                echo 'Logging in to Amazon ECR...'
+                withAWS(credentials: 'aws-ecr-creds', region: "${AWS_REGION}") {
+                    sh '''
+                        aws ecr get-login-password --region ${AWS_REGION} \
+                        | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+                    '''
                 }
             }
         }
 
-       stage('Push to ECR') {
-    steps {
-        withAWS(region: 'ap-south-1', credentials: 'aws-ecr-creds') {
-            withEnv([
-                'AWS_REGION=ap-south-1',
-                'ECR_REGISTRY=108322181673.dkr.ecr.ap-south-1.amazonaws.com',
-                'IMAGE_NAME=ci-cd-demo'
-            ]) {
+        stage('Tag and Push Docker Image') {
+            steps {
+                echo 'Tagging and pushing image to ECR...'
                 sh '''
-                    echo "Logging in to Amazon ECR..."
-                    aws ecr get-login-password --region $AWS_REGION \
-                    | docker login --username AWS --password-stdin $ECR_REGISTRY
+                    docker tag ${ECR_REPO_NAME}:${IMAGE_TAG} ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO_NAME}:${IMAGE_TAG}
+                    docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO_NAME}:${IMAGE_TAG}
+                '''
+            }
+        }
 
-                    echo "Pushing image to ECR..."
-                    docker push $ECR_REGISTRY/$IMAGE_NAME:build-${BUILD_NUMBER}
+        stage('Cleanup') {
+            steps {
+                echo 'Cleaning up local Docker images...'
+                sh '''
+                    docker rmi ${ECR_REPO_NAME}:${IMAGE_TAG} || true
+                    docker rmi ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO_NAME}:${IMAGE_TAG} || true
                 '''
             }
         }
     }
-}
 
-
-
-        stage('Deploy') {
-            steps {
-                echo "Deploy stage — you can later add SSH or ECS deploy steps here."
-            }
+    post {
+        success {
+            echo 'Docker image successfully pushed to AWS ECR!'
+        }
+        failure {
+            echo 'Build failed. Check the logs above for details.'
         }
     }
 }
